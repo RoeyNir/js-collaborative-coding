@@ -7,7 +7,9 @@ import { oneDark } from "@codemirror/theme-one-dark";
 import { io } from "socket.io-client";
 import "./CodeBlockPage.css";
 
-const socket = io("https://js-collaborative-coding-production.up.railway.app");
+const socket = io("https://js-collaborative-coding-production.up.railway.app", {
+    transports: ["websocket", "polling"]
+});
 
 const CodeBlockPage = () => {
     const { id } = useParams();
