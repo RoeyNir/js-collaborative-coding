@@ -19,12 +19,14 @@ const CodeBlockPage = () => {
     const [usersInRoom, setUsersInRoom] = useState(0);
     const [role, setRole] = useState(null);
     const [hasJoined, setHasJoined] = useState(false);
+    const [isCorrect, setIsCorrect] = useState(false);
 
-    // ✅ סטייט לניהול הודעות צ'אט
+
+    // סטייט לניהול הודעות צ'אט
     const [messages, setMessages] = useState([]);
     const [chatMessage, setChatMessage] = useState("");
 
-    // ✅ טעינת קובץ הקוד מהשרת
+    // טעינת קובץ הקוד מהשרת
     useEffect(() => {
         const loadCodeBlock = async () => {
             console.log("🔵 Fetching code block:", id);
@@ -37,7 +39,7 @@ const CodeBlockPage = () => {
         loadCodeBlock();
     }, [id]);
 
-    // ✅ הצטרפות לחדר
+    // הצטרפות לחדר
     useEffect(() => {
         if (!codeBlock || hasJoined) return;
 
@@ -74,7 +76,12 @@ const CodeBlockPage = () => {
         };
     }, [role]);
 
-    // ✅ קבלת הודעות צ'אט
+    // וידוא שחדר לא ייעלם ברענון
+    useEffect(() => {
+        socket.emit("request_user_info", { room_id: id });
+    }, [id]);
+    
+    // קבלת הודעות צ'אט
     useEffect(() => {
         const handleReceiveMessage = (data) => {
             console.log("💬 Received chat message:", data);
@@ -88,7 +95,29 @@ const CodeBlockPage = () => {
         };
     }, []);
 
-    // ✅ שליחת הודעה בצ'אט
+    // שינוי בקוד בזמן אמת
+    useEffect(() => {
+        const handleCodeUpdate = (data) => {
+            console.log("📩 Code update received:", data);
+            setCode(data.code);
+            setIsCorrect(data.is_correct);
+            console.log("✅ isCorrect state updated:", data.is_correct);
+        };
+
+        socket.on("code_update", handleCodeUpdate);
+
+        return () => {
+            socket.off("code_update", handleCodeUpdate);
+        };
+    }, []);
+
+    const handleCodeChange = (newCode) => {
+        // ניקוי רווחים עודפים
+        const trimmedCode = newCode.replace(/\s+/g, ' ').trim();
+        setCode(trimmedCode);
+        socket.emit("code_change", { room: id, code: trimmedCode });
+    };
+    // שליחת הודעה בצ'אט
     const sendMessage = () => {
         if (chatMessage.trim() === "") return;
 
@@ -101,7 +130,7 @@ const CodeBlockPage = () => {
         setChatMessage(""); // ניקוי שדה ההקלדה
     };
 
-    // ✅ יציאה מהחדר (גם מנטור וגם סטודנט)
+    // יציאה מהחדר (גם מנטור וגם סטודנט)
     const exitRoom = () => {
         console.log("🚪 Exiting room:", id);
         socket.emit("leave_room", id);
@@ -127,24 +156,21 @@ const CodeBlockPage = () => {
             <p className="user-role">Your role: <strong>{role || "loading..."}</strong></p>
             <button onClick={exitRoom} className="exit-button">Exit to Lobby</button>
 
-            {/* ✅ עורך הקוד */}
+            {/* עורך הקוד */}
             <div className="code-editor">
                 <CodeMirror
                     value={code}
                     extensions={[javascript()]}
                     theme={oneDark}
-                    onChange={(newCode) => {
-                        if (role !== "mentor") {
-                            setCode(newCode);
-                            socket.emit("code_change", { room: id, code: newCode });
-                        }
-                    }}
+                    onChange={handleCodeChange}
                     basicSetup={{ lineNumbers: true, highlightActiveLine: true, tabSize: 4 }}
                     editable={role !== "mentor"}
                 />
             </div>
 
-            {/* ✅ צ'אט חדר */}
+            {isCorrect && <p className="correct-code">😃 תשובה נכונה!</p>}
+
+            {/* צ'אט חדר */}
             <div className="chat-container">
                 <h3>Chat</h3>
                 <div className="chat-messages">
